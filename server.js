@@ -1,7 +1,13 @@
 const express = require('express');
+const fs = require('fs');
+const path = require('path');
 const PORT = process.env.PORT || 3001;
 // instantiate server
 const app = express();
+// parse incoming string or array data
+app.use(express.urlencoded({ extended: true }));
+// parse incoming JSON data
+app.use(express.json());
 const { animals } = require('./data/animals');
 
 function filterByQuery(query, animalsArray) {
@@ -49,6 +55,41 @@ function findById(id, animalsArray) {
     return result;
 }
 
+// creates new animal from post request
+// pushes into animals array local copy
+// adds to animals.json file
+function createNewAnimal(body, animalsArray) {
+    // creation from post request
+    const animal = body;
+
+    // to local copy
+    animalsArray.push(animal);
+
+    // to json file
+    fs.writeFileSync(
+        path.join(__dirname,  './data/animals.json'),
+        JSON.stringify({ animals: animalsArray }, null, 2)
+    );
+
+    return animal;
+}
+
+function validateAnimal(animal) {
+    if (!animal.name || typeof animal.name !== 'string') {
+        return false;
+    }
+    if (!animal.species || typeof animal.species !== 'string') {
+        return false;
+    }
+    if (!animal.diet || typeof animal.diet !== 'string') {
+        return false;
+    }
+    if(!animal.personalityTraits || !Array.isArray(animal.personalityTraits)) {
+        return false;
+    }
+    return true;
+}
+
 app.get('/api/animals', (req, res) => {
     let results = animals;
     if(req.query) {
@@ -66,6 +107,23 @@ app.get('/api/animals/:id', (req, res) => {
     else {
         res.send(404);
     }
+});
+
+app.post('/api/animals', (req,res) => {
+    // req.body is where our incoming content will be
+    
+    //set id based on what the next index of the array will be
+    req.body.id = animals.length.toString();
+
+    // if any data in req.body is incorrect, send 400 error back
+    if (!validateAnimal(req.body)) {
+        res.status(400).send('The animal is not properly formatted.');
+    }
+    else {
+        // add animal to json file and animals array in this function
+        const animal = createNewAnimal(req.body, animals);
+    }
+    res.json(req.body);
 });
 
 app.listen(PORT, () => {
